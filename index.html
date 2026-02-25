@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Honey Hub Games — Admin Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#060810;--panel:#0d1117;--border:#1e2d40;--gold:#f0c040;--red:#ff3b3b;--cyan:#00e5ff;--green:#00ff88;--text:#c8d8e8;--muted:#4a6070;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;}
+  body::before{content:'';position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px);background-size:40px 40px;}
+  body::after{content:'';position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse at 50% 0%,rgba(240,192,64,0.05) 0%,transparent 60%);}
+  .wrap{position:relative;z-index:1;width:100%;max-width:560px;}
+  .title{font-family:'Black Han Sans',sans-serif;font-size:clamp(22px,5vw,40px);color:var(--gold);text-align:center;margin-bottom:4px;}
+  .sub{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:4px;text-align:center;margin-bottom:36px;}
+
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:32px;margin-bottom:20px;}
+  .card-label{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:4px;color:var(--muted);margin-bottom:16px;}
+
+  /* STATUS */
+  .status-row{display:flex;align-items:center;gap:14px;}
+  .status-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+  .status-dot.green{background:var(--green);box-shadow:0 0 8px var(--green);}
+  .status-dot.red{background:var(--red);box-shadow:0 0 8px var(--red);}
+  .status-dot.grey{background:var(--muted);}
+  .status-text{font-family:'Share Tech Mono',monospace;font-size:14px;}
+
+  /* WINNER BOX */
+  .winner-box{background:linear-gradient(135deg,rgba(240,192,64,0.07),rgba(255,170,0,0.03));border:1px solid rgba(240,192,64,0.25);border-radius:10px;padding:24px;text-align:center;}
+  .winner-crown{font-size:48px;margin-bottom:12px;}
+  .winner-name{font-family:'Black Han Sans',sans-serif;font-size:32px;color:var(--gold);margin-bottom:8px;}
+  .winner-time{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:2px;}
+
+  /* NO WINNER */
+  .no-winner{text-align:center;padding:20px 0;}
+  .no-winner-icon{font-size:40px;margin-bottom:12px;}
+  .no-winner-text{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--muted);letter-spacing:2px;}
+
+  /* BUTTONS */
+  .btn-row{display:flex;gap:12px;margin-top:8px;}
+  .btn{flex:1;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;letter-spacing:2px;text-transform:uppercase;border:none;border-radius:8px;padding:13px;cursor:pointer;transition:all 0.2s;}
+  .btn-refresh{background:rgba(0,229,255,0.1);border:1px solid rgba(0,229,255,0.25);color:var(--cyan);}
+  .btn-refresh:hover{background:rgba(0,229,255,0.18);}
+  .btn-reset{background:rgba(255,59,59,0.1);border:1px solid rgba(255,59,59,0.25);color:var(--red);}
+  .btn-reset:hover{background:rgba(255,59,59,0.18);}
+
+  .log{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);text-align:center;margin-top:6px;min-height:16px;letter-spacing:1px;}
+  .pulse{animation:pulse 1s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="title">🍯 ADMIN PANEL</div>
+  <div class="sub">// HONEY HUB GAMES · GAUNTLET</div>
+
+  <div class="card">
+    <div class="card-label">// COMPETITION STATUS</div>
+    <div class="status-row" id="status-row">
+      <div class="status-dot grey" id="status-dot"></div>
+      <div class="status-text" id="status-text">Loading...</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">// WINNER</div>
+    <div id="winner-area">
+      <div class="no-winner">
+        <div class="no-winner-icon">⏳</div>
+        <div class="no-winner-text pulse">LOADING...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-refresh" onclick="checkWinner()">↻ REFRESH</button>
+    <button class="btn btn-reset" onclick="resetWinner()">✕ RESET WINNER</button>
+  </div>
+  <div class="log" id="log"></div>
+</div>
+
+<script>
+const STORAGE_KEY = 'gauntlet:winner:v3';
+
+function log(msg){ document.getElementById('log').textContent = msg; }
+
+async function checkWinner() {
+  log('Checking...');
+  try {
+    const result = await window.storage.get(STORAGE_KEY, true);
+    if (result && result.value) {
+      const data = JSON.parse(result.value);
+      const date = data.ts ? new Date(data.ts).toUTCString() : 'Unknown time';
+
+      document.getElementById('status-dot').className = 'status-dot red';
+      document.getElementById('status-text').textContent = 'Competition ended — winner claimed';
+      document.getElementById('winner-area').innerHTML = `
+        <div class="winner-box">
+          <div class="winner-crown">👑</div>
+          <div class="winner-name">@${data.winner}</div>
+          <div class="winner-time">${date}</div>
+        </div>`;
+      log('Last checked: ' + new Date().toLocaleTimeString());
+    } else {
+      document.getElementById('status-dot').className = 'status-dot green';
+      document.getElementById('status-text').textContent = 'Active — no winner yet';
+      document.getElementById('winner-area').innerHTML = `
+        <div class="no-winner">
+          <div class="no-winner-icon">🏆</div>
+          <div class="no-winner-text">NO WINNER YET</div>
+        </div>`;
+      log('Last checked: ' + new Date().toLocaleTimeString());
+    }
+  } catch(e) {
+    document.getElementById('status-dot').className = 'status-dot grey';
+    document.getElementById('status-text').textContent = 'Could not reach storage';
+    log('Error: ' + e.message);
+  }
+}
+
+async function resetWinner() {
+  if (!confirm('Reset the winner? This lets the competition run again.')) return;
+  try {
+    await window.storage.delete(STORAGE_KEY, true);
+    log('✓ Winner reset successfully!');
+    await checkWinner();
+  } catch(e) {
+    log('Reset failed: ' + e.message);
+  }
+}
+
+// Auto-check on load and every 15 seconds
+checkWinner();
+setInterval(checkWinner, 15000);
+</script>
+</body>
+</html>
