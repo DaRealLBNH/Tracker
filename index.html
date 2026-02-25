@@ -81,27 +81,28 @@
 </div>
 
 <script>
-const STORAGE_KEY = 'gauntlet:winner:v3';
+const BIN_ID  = '699e42a443b1c97be99b031d';
+const API_KEY = '$2a$10$w4/ubysjbu4myflrdR94T.vh/Okv.xHTTrOpwzc3YhL1TWejyG/8m';
+const BIN_URL = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
 
 function log(msg){ document.getElementById('log').textContent = msg; }
 
 async function checkWinner() {
   log('Checking...');
   try {
-    const result = await window.storage.get(STORAGE_KEY, true);
-    if (result && result.value) {
-      const data = JSON.parse(result.value);
-      const date = data.ts ? new Date(data.ts).toUTCString() : 'Unknown time';
+    const res = await fetch(BIN_URL + '/latest', { headers: { 'X-Master-Key': API_KEY } });
+    const json = await res.json();
+    const data = json.record;
 
+    if (data && data.claimed) {
       document.getElementById('status-dot').className = 'status-dot red';
       document.getElementById('status-text').textContent = 'Competition ended — winner claimed';
       document.getElementById('winner-area').innerHTML = `
         <div class="winner-box">
           <div class="winner-crown">👑</div>
           <div class="winner-name">@${data.winner}</div>
-          <div class="winner-time">${date}</div>
+          <div class="winner-time">${data.ts || 'Unknown time'}</div>
         </div>`;
-      log('Last checked: ' + new Date().toLocaleTimeString());
     } else {
       document.getElementById('status-dot').className = 'status-dot green';
       document.getElementById('status-text').textContent = 'Active — no winner yet';
@@ -110,11 +111,11 @@ async function checkWinner() {
           <div class="no-winner-icon">🏆</div>
           <div class="no-winner-text">NO WINNER YET</div>
         </div>`;
-      log('Last checked: ' + new Date().toLocaleTimeString());
     }
+    log('Last checked: ' + new Date().toLocaleTimeString());
   } catch(e) {
     document.getElementById('status-dot').className = 'status-dot grey';
-    document.getElementById('status-text').textContent = 'Could not reach storage';
+    document.getElementById('status-text').textContent = 'Could not reach jsonbin';
     log('Error: ' + e.message);
   }
 }
@@ -122,7 +123,11 @@ async function checkWinner() {
 async function resetWinner() {
   if (!confirm('Reset the winner? This lets the competition run again.')) return;
   try {
-    await window.storage.delete(STORAGE_KEY, true);
+    await fetch(BIN_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
+      body: JSON.stringify({ claimed: false, winner: null, ts: null })
+    });
     log('✓ Winner reset successfully!');
     await checkWinner();
   } catch(e) {
@@ -130,7 +135,6 @@ async function resetWinner() {
   }
 }
 
-// Auto-check on load and every 15 seconds
 checkWinner();
 setInterval(checkWinner, 15000);
 </script>
